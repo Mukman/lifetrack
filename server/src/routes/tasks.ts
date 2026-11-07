@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { prisma } from '../db.js';
+import { requireAuth } from '../middleware/auth.js';
+export const tasksRouter = Router();
+tasksRouter.use(requireAuth);
+const taskInput = z.object({ title: z.string().trim().min(1).max(120), time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('09:00'), category: z.string().trim().min(1).max(40).default('Personal'), priority: z.enum(['High','Medium','Low']).default('Medium'), done: z.boolean().default(false), dueDate: z.string().date().optional().nullable() });
+tasksRouter.get('/', async (req, res, next) => { try { const tasks = await prisma.task.findMany({ where: { userId: req.userId }, orderBy: [{ done: 'asc' }, { createdAt: 'desc' }] }); res.json({ tasks }); } catch (e) { next(e); } });
+tasksRouter.post('/', async (req, res, next) => { try { const input = taskInput.parse(req.body); const task = await prisma.task.create({ data: { ...input, dueDate: input.dueDate ? new Date(`${input.dueDate}T00:00:00.000Z`) : null, userId: req.userId! } }); res.status(201).json({ task }); } catch (e) { next(e); } });
+tasksRouter.patch('/:id', async (req, res, next) => { try { const input = taskInput.partial().parse(req.body); const data = { ...(input.title !== undefined ? { title: input.title } : {}), ...(input.time !== undefined ? { time: input.time } : {}), ...(input.category !== undefined ? { category: input.category } : {}), ...(input.priority !== undefined ? { priority: input.priority } : {}), ...(input.done !== undefined ? { done: input.done } : {}), ...(input.dueDate !== undefined ? { dueDate: input.dueDate ? new Date(`${input.dueDate}T00:00:00.000Z`) : null } : {}) }; const result = await prisma.task.updateMany({ where: { id: req.params.id, userId: req.userId }, data }); if (!result.count) return res.status(404).json({ error: 'Task not found.' }); const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: req.userId } }); res.json({ task }); } catch (e) { next(e); } });
+tasksRouter.delete('/:id', async (req, res, next) => { try { const result = await prisma.task.deleteMany({ where: { id: req.params.id, userId: req.userId } }); if (!result.count) return res.status(404).json({ error: 'Task not found.' }); res.status(204).end(); } catch (e) { next(e); } });

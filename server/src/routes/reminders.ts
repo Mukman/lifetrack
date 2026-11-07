@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { prisma } from '../db.js';
+import { requireAuth } from '../middleware/auth.js';
+export const remindersRouter = Router();
+remindersRouter.use(requireAuth);
+const inputSchema = z.object({ title: z.string().trim().min(1).max(120), dueAt: z.string().datetime(), done: z.boolean().default(false) });
+remindersRouter.get('/', async (req, res, next) => { try { const reminders = await prisma.reminder.findMany({ where: { userId: req.userId }, orderBy: { dueAt: 'asc' } }); res.json({ reminders }); } catch (e) { next(e); } });
+remindersRouter.post('/', async (req, res, next) => { try { const input = inputSchema.parse(req.body); const reminder = await prisma.reminder.create({ data: { ...input, dueAt: new Date(input.dueAt), userId: req.userId! } }); res.status(201).json({ reminder }); } catch (e) { next(e); } });
+remindersRouter.patch('/:id', async (req, res, next) => { try { const input = inputSchema.partial().parse(req.body); const data = { ...(input.title !== undefined ? { title: input.title } : {}), ...(input.dueAt !== undefined ? { dueAt: new Date(input.dueAt) } : {}), ...(input.done !== undefined ? { done: input.done } : {}) }; const result = await prisma.reminder.updateMany({ where: { id: req.params.id, userId: req.userId }, data }); if (!result.count) return res.status(404).json({ error: 'Reminder not found.' }); const reminder = await prisma.reminder.findFirst({ where: { id: req.params.id, userId: req.userId } }); res.json({ reminder }); } catch (e) { next(e); } });
+remindersRouter.delete('/:id', async (req, res, next) => { try { const result = await prisma.reminder.deleteMany({ where: { id: req.params.id, userId: req.userId } }); if (!result.count) return res.status(404).json({ error: 'Reminder not found.' }); res.status(204).end(); } catch (e) { next(e); } });

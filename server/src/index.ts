@@ -1,0 +1,41 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import { ZodError } from 'zod';
+import { env } from './env.js';
+import { prisma } from './db.js';
+import { authRouter } from './routes/auth.js';
+import { tasksRouter } from './routes/tasks.js';
+import { transactionsRouter } from './routes/transactions.js';
+import { habitsRouter } from './routes/habits.js';
+import { preferencesRouter } from './routes/preferences.js';
+import { remindersRouter } from './routes/reminders.js';
+import { calendarRouter } from './routes/calendar.js';
+import { backupRouter } from './routes/backup.js';
+
+const app = express();
+app.disable('x-powered-by');
+app.use(helmet());
+app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(cookieParser());
+app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', service: 'lifetrack-api', version: '0.2.0' }));
+app.use('/api/v1/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false }), authRouter);
+app.use('/api/v1/tasks', tasksRouter);
+app.use('/api/v1/transactions', transactionsRouter);
+app.use('/api/v1/habits', habitsRouter);
+app.use('/api/v1/preferences', preferencesRouter);
+app.use('/api/v1/reminders', remindersRouter);
+app.use('/api/v1/calendar', calendarRouter);
+app.use('/api/v1/backup', backupRouter);
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof ZodError) return res.status(400).json({ error: 'Please check the submitted information.', details: err.issues.map(i => ({ field: i.path.join('.'), message: i.message })) });
+  if (typeof err === 'object' && err && 'code' in err && err.code === 'P2002') return res.status(409).json({ error: 'That value is already in use.' });
+  console.error('API error:', err);
+  res.status(500).json({ error: 'An unexpected server error occurred.' });
+});
+const server = app.listen(env.PORT, () => console.log(`LifeTrack API listening on http://localhost:${env.PORT}`));
+async function shutdown() { server.close(); await prisma.$disconnect(); process.exit(0); }
+process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);

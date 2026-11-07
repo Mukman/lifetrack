@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String          @db.VarChar(80)
+  email          String          @unique
+  passwordHash   String          @db.VarChar(255)
+  currency       String          @default("ETB") @db.VarChar(3)
+  timezone       String          @default("Africa/Addis_Ababa") @db.VarChar(64)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  monthlyBudget  Float           @default(5000)
+  savedAmount    Float           @default(3500)
+  savingsGoal    Float           @default(20000)
+  calendarEvents CalendarEvent[]
+  habits         Habit[]
+  reminders      Reminder[]
+  tasks          Task[]
+  transactions   Transaction[]
+
+  @@map("users")
+}
+
+model Task {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String    @db.VarChar(120)
+  time      String    @default("09:00") @db.VarChar(5)
+  category  String    @default("Personal") @db.VarChar(40)
+  priority  String    @default("Medium") @db.VarChar(10)
+  done      Boolean   @default(false)
+  dueDate   DateTime? @db.Date
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dueDate])
+  @@map("tasks")
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @db.VarChar(100)
+  category  String   @default("Other") @db.VarChar(40)
+  amount    Decimal  @db.Decimal(14, 2)
+  type      String   @db.VarChar(10)
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("transactions")
+}
+
+model Habit {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   @db.VarChar(100)
+  note      String   @default("") @db.VarChar(255)
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("habits")
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @db.VarChar(120)
+  dueAt     DateTime
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dueAt])
+  @@map("reminders")
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String   @db.VarChar(120)
+  description String?  @db.VarChar(500)
+  date        DateTime @db.Date
+  startTime   String   @db.VarChar(5)
+  endTime     String   @db.VarChar(5)
+  category    String   @default("Personal") @db.VarChar(40)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("calendar_events")
+}
