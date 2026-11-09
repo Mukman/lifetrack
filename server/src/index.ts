@@ -36,6 +36,8 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   console.error('API error:', err);
   res.status(500).json({ error: 'An unexpected server error occurred.' });
 });
-const server = app.listen(env.PORT, () => console.log(`LifeTrack API listening on http://localhost:${env.PORT}`));
+const server = app.listen(env.PORT, '0.0.0.0', () =>
+  console.log(`LifeTrack API listening on port ${env.PORT}`)
+);
 async function shutdown() { server.close(); await prisma.$disconnect(); process.exit(0); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
